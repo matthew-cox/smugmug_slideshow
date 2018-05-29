@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 '''
-SlideShow - control the image slideshow
+Run a SmugMug Slideshow
 '''
 #
 # Standard Imports
@@ -13,13 +13,14 @@ from datetime import date, datetime
 import json
 import logging
 import os
-import random
 import sys
 #
 # Non-standard imports
 #
-# import exifread
-import requests
+from io import BytesIO
+import pygame
+from pygame import display, image, time
+# from pygame.locals import *
 #
 # Ensure . is in the lib path for local includes
 #
@@ -28,245 +29,209 @@ sys.path.append(os.path.realpath('.'))
 # pylint: disable=wrong-import-position
 # local directory imports here
 #
-from smug import SmugRss
+from smug import Slideshow
 #
-####################################################################################
+##############################################################################
 #
-# pylint: disable=too-many-instance-attributes
-class SlideShow(object):
+# Global Variables
+#
+DEFAULT_LOG_LEVEL = 'WARNING'
+
+# How long to display each image (in seconds)
+DISPLAY_TIME = 45 * 1000
+
+GALLERY_ID = '159365802_Wp7NDr'
+
+STARTUP_TEXT = """
+
+SmugMug Slideshow
+
+[Escape]    Stop the show
+[  <-  ]    Previous image
+[  ->  ]    Next image
+
+"""
+#
+##############################################################################
+#
+# _get_logger() - reusable code to get the correct logger by name
+#
+def _get_logger():
+    '''_get_logger() - reuable code to get the correct logger by name'''
+    return logging.getLogger(os.path.basename(__file__))
+#
+##############################################################################
+#
+# _json_dump() - Little output to DRY
+#
+def _json_dump(the_thing, pretty=False):
+    '''_json_dump() - Little output to DRY'''
+    output = None
+    if pretty:
+        output = json.dumps(the_thing, default=_json_serial, sort_keys=True, indent=4,
+                            separators=(',', ': '))
+    else:
+        output = json.dumps(the_thing, default=_json_serial)
+    return output
+
+def _json_serial(obj):
+    '''JSON serializer for objects not serializable by default json code'''
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError("Type %s not serializable" % type(obj))
+#
+##############################################################################
+#
+# init_display()
+#
+def init_display():
     '''
-    SlideShow - gather up the slideshow stuff
+    init_display() - init pygame display
     '''
-    #
-    ####################################################################################
-    #
-    # Class variables
-    #
-    # Maximum size of images to cache (in bytes)
-    MAX_CACHE_SIZE = 128 * 1024 * 1024
-    #
-    ##############################################################################
-    #
-    # __init__()
-    #
-    def __init__(self, gallery_id=None, height=None, width=None):
-        super(SlideShow, self).__init__()
+    # Get the size of the display
+    display.init()
+    # Hide the mouse
+    pygame.mouse.set_visible(0)
+    info = display.Info()
+    max_y = info.current_h
+    max_x = info.current_w
 
-        self._logger = logging.getLogger(type(self).__name__)
+    _get_logger().info(info)
 
-        self._cache = {}
-        self._cache_size = 0
+    # pylint: disable=no-member
+    display.set_mode((max_x, max_y), pygame.NOFRAME)
+#
+##############################################################################
+#
+# init_fonts()
+#
+def init_fonts():
+    '''
+    init_fonts() - init pygame fonts
+    '''
+    pygame.font.init()
+    fonts = {}
+    fonts['font_path'] = pygame.font.match_font(u'arial')
+    _get_logger().info(fonts['font_path'])
+    fonts['small'] = pygame.font.Font(fonts['font_path'], 20)
+    fonts['medium'] = pygame.font.Font(fonts['font_path'], 30)
+    fonts['large'] = pygame.font.Font(fonts['font_path'], 60)
 
-        self._height = height
-        self.__width = width
+    return fonts
+#
+##############################################################################
+#
+# draw_image()
+#
+def draw_image(image_file=None):
+    '''
+    draw_image(display, image_file) - Draw the provided image on the global display
+    '''
+    update_display = False
 
-        self._loop_pos = 0
+    if None not in [display, image_file]:
 
-        # load the gallery RSS - do this last
-        self._gallery = None
-        self._gallery_id = gallery_id
-        self.load_gallery()
+        # pylint: disable=bare-except
+        try:
+            picture = image.load(image_file)
+
+            main_surface = display.get_surface()
+            imagepos = picture.get_rect()
+            imagepos.centerx = main_surface.get_rect().centerx
+            imagepos.centery = main_surface.get_rect().centery
+            main_surface.blit(picture, imagepos)
+            update_display = True
+        except:
+            update_display = False
+    return update_display
+#
+##############################################################################
+#
+# main()
+#
+def main():
+    '''
+    main() - Run the slide show
+    '''
+    # Configure logging
+    logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
+                        level=getattr(logging, DEFAULT_LOG_LEVEL))
+
+    # pylint: disable=no-member
+    pygame.init()
+
+    # init the pygame dislay (Sloooooow)
+    init_display()
+
+    info = display.Info()
+
+    slide_show = Slideshow(gallery_id=GALLERY_ID, height=info.current_h, width=info.current_w)
+
+    # init fonts
+    # fonts = init_fonts()
+
+    # Load main display area
+    # main_surface = pygame.display.get_surface()
     #
-    ##############################################################################
-    #
-    # _cache_get()
-    #
-    def _cache_get(self, key=None, url=None):
+    # center_x = main_surface.get_rect().centerx
+    # center_y = main_surface.get_rect().centery
 
-        result = None
-        if None not in [key, url]:
+    # Display startup message for 5 seconds
+    # text = fonts['large'].render(STARTUP_TEXT, 1, (0, 0, 0))
+    # main_surface.blit(text, (center_x, center_y))
+    # display.flip()
+    # pygame.time.delay(5000)
 
-            # do we already have the data?
-            if None in [self._cache.get(key)]:
-                result = self.load_image(image_url=url)
-                # cache the image for re-use
-                self._cache_size += sys.getsizeof(result)
-                self._cache[key] = result
-            else:
-                result = self._cache[key]
-        return result
-    #
-    ##############################################################################
-    #
-    # _cache_size_check()
-    #
-    def _cache_size_check(self):
+    # Start by drawing the first image
+    draw_image(image_file=BytesIO(slide_show.current()))
 
-        # is the cache too large?
-        self._logger.debug("Cache is %fMb", (self._cache_size / 1024 / 1024))
-        while self._cache_size >= self.MAX_CACHE_SIZE:
-            key = random.choice(list(self._cache.keys()))
-            self._logger.warning("Clearing '%s' from cache!", key)
-            # pylint: disable=bare-except
-            try:
-                self._cache_size -= sys.getsizeof(self._cache[key])
-                del self._cache[key]
-            except:
-                pass
-            self._logger.warning("Cache is %fMb", (self._cache_size / 1024 /1024))
-    #
-    ##############################################################################
-    #
-    # _json_dump() - Little output to DRY
-    #
-    def _json_dump(self, the_thing, pretty=False):
-        '''_json_dump() - Little output to DRY'''
-        output = None
-        if pretty:
-            output = json.dumps(the_thing, sort_keys=True, indent=4,
-                                separators=(',', ': '))
-        else:
-            output = json.dumps(the_thing, default=self._json_serial)
-        return output
+    # draw an image every so often by sending an event on an interval
+    # pylint: disable=no-member
+    time.set_timer(pygame.USEREVENT, DISPLAY_TIME)
 
-    @staticmethod
-    def _json_serial(obj):
-        '''JSON serializer for objects not serializable by default json code'''
+    # the event loop
+    while 1:
 
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        # else:
-        #     return obj.__dict__
-        raise TypeError("Type %s not serializable" % type(obj))
-    #
-    ##############################################################################
-    #
-    ##############################################################################
-    #
-    # find_best_image_size()
-    #
-    def find_best_image_size(self):
-        '''
-        find_best_image_size() - Choose the best size image for the set W x H
-        '''
-        img = None
-        media_content = self._gallery[self._loop_pos].get('media_content')
-        self._logger.info("Searching for an image...")
-        if None not in [media_content]:
+        update = True
+        try:
+            for event in pygame.event.get():
 
-            for image in media_content:
-                self._logger.debug(self._json_dump(image, True))
+                # pylint: disable=no-member
+                if event.type == pygame.QUIT:
+                    sys.exit(0)
 
-                # sometimes the crop sizes aren't quite even in both dimensions -
-                # check +/- 15 pixels
-                if (
-                        (self.__width - 15) <= int(image.get('width')) <= (self.__width + 15) or
-                        (self._height - 15) <= int(image.get('height')) <= (self._height + 15)
-                    ):
-                    img = image
-                    self._logger.debug("Found a match: %s", self._json_dump(image, True))
-                    break
+                # keypresses
+                # pylint: disable=no-member
+                if event.type == pygame.KEYUP:
+                    # look for escape key
+                    # pylint: disable=no-member
+                    if event.key == pygame.K_ESCAPE:
+                        sys.exit(0)
 
-        if None in [img]:
-            self._logger.error("No image size match found in: %s",
-                               self._json_dump(media_content, True))
+                    # left arrow - display the previous image
+                    # pylint: disable=no-member
+                    if event.key == pygame.K_LEFT:
+                        # Draw the image
+                        update = draw_image(image_file=BytesIO(slide_show.previous()))
 
-        return img
-    #
-    ##############################################################################
-    #
-    # load_gallery()
-    #
-    def load_gallery(self, gallery_id=None, shuffle=True):
-        '''
-        load_gallery(gallery_id, shuffle) - Load the feed for the provided Gallery id
-        '''
-        self._gallery = None
+                    # right arrow - display the next image
+                    # pylint: disable=no-member
+                    if event.key == pygame.K_RIGHT:
+                        # Draw the image
+                        update = draw_image(image_file=BytesIO(slide_show.next()))
 
-        gallery_id = gallery_id if gallery_id else self._gallery_id
+                # image display events
+                # pylint: disable=no-member
+                if event.type == pygame.USEREVENT:
+                    # Draw the image
+                    update = draw_image(image_file=BytesIO(slide_show.next()))
 
-        if None not in [gallery_id]:
-            self._logger.info("Loading gallery with id '%s'", gallery_id)
-            smugmug = SmugRss(site_url='www.azriel.photo', nickname='azriel')
-            self._gallery = smugmug.get_gallery_feed(gallery=gallery_id)
+                # Update the display - sometimes can't find a good image size match
+                if update:
+                    display.flip()
+        except KeyboardInterrupt:
+            sys.exit(0)
 
-            if shuffle:
-                random.shuffle(self._gallery)
-    #
-    ##############################################################################
-    #
-    # load_image()
-    #
-    def load_image(self, image_url=None):
-        '''
-        load_image(image_url) - Load image data from the provided URL
-        '''
-        result = None
-        if None not in [image_url]:
-            self._logger.info("Loading image '%s'", image_url)
-            # Download the image
-            img_data = requests.get(image_url)
-
-            result = img_data.content
-
-        return result
-
-    #
-    ##############################################################################
-    #
-    # current()
-    #
-    def current(self):
-        '''
-        current() - return the data for the current image
-        '''
-
-        result = None
-
-        img = self.find_best_image_size()
-
-        if None not in [img]:
-
-            file_name = os.path.basename(img.get('url'))
-            self._logger.debug(self._json_dump(img, True))
-
-            result = self._cache_get(file_name, img.get('url'))
-            self._cache_size_check()
-
-        return result
-    #
-    ##############################################################################
-    #
-    # next()
-    #
-    def next(self):
-        '''
-        next() - return the data for the next image
-        '''
-        self._loop_pos += 1
-
-        # do we need to reset the loop?
-        if self._loop_pos >= len(self._gallery):
-            # re-load the gallery (on the off chance it has been updated while we were running)
-            self.load_gallery()
-            self._loop_pos = 0
-
-        return self.current()
-    #
-    ##############################################################################
-    #
-    # previous()
-    #
-    def previous(self):
-        '''
-        previous() - return the data for the next image
-        '''
-        self._loop_pos -= 1
-
-        # have we looped around?
-        if self._loop_pos <= 0:
-            self._loop_pos = len(self._gallery)
-
-        return self.current()
-    # Return Exif tags
-    # try:
-    #     tags = exifread.process_file(BytesIO(img_data.content), details=False)
-    # except (Exception) as err:
-    #     raise err
-    #
-    # print(tags)
-
-    # Display some image info
-    # displayText = "Matt Test"
-    # text = largefont.render(displayText, 1, (255, 255, 255))
-    # main_surface.blit(text, (main_surface.get_rect().centerx,main_surface.get_rect().centery))
+if __name__ == '__main__':
+    main()
