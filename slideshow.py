@@ -40,16 +40,15 @@ DEFAULT_LOG_LEVEL = 'WARNING'
 # How long to display each image (in seconds)
 DISPLAY_TIME = 45 * 1000
 
+FONT = 'courier'
+
 GALLERY_ID = '159365802_Wp7NDr'
 
-STARTUP_TEXT = """
-
-SmugMug Slideshow
+STARTUP_TEXT = """SmugMug Slideshow
 
 [Escape]    Stop the show
 [  <-  ]    Previous image
 [  ->  ]    Next image
-
 """
 #
 ##############################################################################
@@ -87,7 +86,7 @@ def _json_serial(obj):
 #
 def init_display():
     '''
-    init_display() - init pygame display
+    Initialize pygame display
     '''
     # Get the size of the display
     display.init()
@@ -108,11 +107,14 @@ def init_display():
 #
 def init_fonts():
     '''
-    init_fonts() - init pygame fonts
+    Initialize pygame fonts
+
+    Returns:
+        dict: Dictionary of font path and three loaded font sizes
     '''
     pygame.font.init()
     fonts = {}
-    fonts['font_path'] = pygame.font.match_font(u'arial')
+    fonts['font_path'] = pygame.font.match_font(FONT)
     _get_logger().info(fonts['font_path'])
     fonts['small'] = pygame.font.Font(fonts['font_path'], 20)
     fonts['medium'] = pygame.font.Font(fonts['font_path'], 30)
@@ -124,9 +126,16 @@ def init_fonts():
 #
 # draw_image()
 #
-def draw_image(image_file=None):
+def draw_image(surface=display.get_surface(), image_file=None):
     '''
-    draw_image(display, image_file) - Draw the provided image on the global display
+    Draw the provided image on the global display
+
+    Args:
+        surface (pygame.display): On which display to draw. Default: display.get_surface()
+        image_file (str or buffer): File path on disk or binary buffer
+
+    Returns:
+        True or False indicating sucess and that the display should be updated
     '''
     update_display = False
 
@@ -136,11 +145,11 @@ def draw_image(image_file=None):
         try:
             picture = image.load(image_file)
 
-            main_surface = display.get_surface()
+            surface.fill(pygame.Color('black'))
             imagepos = picture.get_rect()
-            imagepos.centerx = main_surface.get_rect().centerx
-            imagepos.centery = main_surface.get_rect().centery
-            main_surface.blit(picture, imagepos)
+            imagepos.centerx = surface.get_rect().centerx
+            imagepos.centery = surface.get_rect().centery
+            surface.blit(picture, imagepos)
             update_display = True
         except:
             update_display = False
@@ -148,11 +157,56 @@ def draw_image(image_file=None):
 #
 ##############################################################################
 #
+# draw_multiline_text()
+#
+def draw_multiline_text(surface=None, text=None, pos=None, font=None, color=pygame.Color('white')):
+    '''
+    Render multiple lines of text. Adapted from:
+    https://stackoverflow.com/questions/42014195/rendering-text-with-multiple-lines-in-pygame
+
+    Args:
+        color (pygame.color): Default white
+        font (pygame.font): Required
+        pos (set): Two position set x and y where to start drawing the text
+        surface (pygame.display): Required
+        text (str): Required
+
+    Raises:
+        RuntimeError: For any missing argument
+        Probably Pygame exception or something
+    '''
+
+    if None in [surface, text, pos, font]:
+        raise RuntimeError("Missing a required argument!")
+
+    # Create 2D array where each row is a list of words.
+    words = [word.split(' ') for word in text.splitlines()]
+
+    # The width of a space.
+    space = font.size(' ')[0]
+
+    max_width = surface.get_size()[0]
+
+    current_x, current_y = pos
+    for line in words:
+        for word in line:
+            word_surface = font.render(word, 0, color)
+            word_width, word_height = word_surface.get_size()
+            if current_x + word_width >= max_width:
+                current_x = pos[0]  # Reset the x.
+                current_y += word_height  # Start on new row.
+            surface.blit(word_surface, (current_x, current_y))
+            current_x += word_width + space
+        current_x = pos[0]  # Reset the x.
+        current_y += word_height  # Start on new row.
+#
+##############################################################################
+#
 # main()
 #
 def main():
     '''
-    main() - Run the slide show
+    Run the slideshow
     '''
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
@@ -169,19 +223,20 @@ def main():
     slide_show = Slideshow(gallery_id=GALLERY_ID, height=info.current_h, width=info.current_w)
 
     # init fonts
-    # fonts = init_fonts()
+    fonts = init_fonts()
 
     # Load main display area
-    # main_surface = pygame.display.get_surface()
-    #
-    # center_x = main_surface.get_rect().centerx
-    # center_y = main_surface.get_rect().centery
+    main_surface = pygame.display.get_surface()
+    main_surface.fill(pygame.Color('black'))
+
+    center_x = main_surface.get_rect().centerx
+    center_y = main_surface.get_rect().centery
 
     # Display startup message for 5 seconds
-    # text = fonts['large'].render(STARTUP_TEXT, 1, (0, 0, 0))
-    # main_surface.blit(text, (center_x, center_y))
-    # display.flip()
-    # pygame.time.delay(5000)
+    draw_multiline_text(surface=main_surface, text=STARTUP_TEXT, pos=(center_x, center_y),
+                        font=fonts['medium'])
+    display.flip()
+    pygame.time.delay(5000)
 
     # Start by drawing the first image
     draw_image(image_file=BytesIO(slide_show.current()))

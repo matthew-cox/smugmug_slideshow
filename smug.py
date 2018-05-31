@@ -78,6 +78,7 @@ class SmugRss(SmugBase):
     # Class variables
     #
     NICK_URL = 'https://{url}/hack/feed.mg?Type=nickname&Data={nick}&format=rss200'
+
     # 159365802_Wp7NDr
     GALLERY_URL = 'https://{url}/hack/feed.mg?Type=gallery&Data={gallery}&format=rss200'
     #
@@ -104,10 +105,15 @@ class SmugRss(SmugBase):
     #
     def get_gallery_feed(self, gallery=None, category=None, year=None):
         '''
-        get_gallery_feed(category, year) - Load the feed of recent items
+        Load the feed of recent items
 
-            category - Limit items to provided category (first port of URL path)
-            year - Limit items to provided year of modification
+        Args:
+            category (str): Limit items to provided category (first portion of URL path)
+            gallery (str): SmugMug gallery id
+            year (str): Limit items to provided year of modification
+
+        Returns:
+            list: List of matching galleries from the feed
         '''
         results = None
 
@@ -142,10 +148,12 @@ class SmugRss(SmugBase):
     #
     def get_recent(self, category=None, year=None):
         '''
-        get_recent(category, year) - Load the feed of recent items
+        Load the feed of recent items
 
-            category - Limit items to provided category (first port of URL path)
-            year - Limit items to provided year of modification
+        Args:
+            category (str): Limit items to provided category (first portion of URL path)
+            gallery (str): SmugMug gallery id
+            year (str): Limit items to provided year of modification
         '''
         self._recent = feedparser.parse(self._recent_feed_url).get('entries')
 
@@ -174,12 +182,12 @@ class SmugRss(SmugBase):
     #
     @property
     def entries(self):
-        '''entries - current RSS feed entries'''
+        '''list: current RSS feed entries'''
         return self._entries
 
     @property
     def site_url(self):
-        '''site_url - URL of the loaded feed'''
+        '''str: URL of the loaded feed'''
         return self._site_url
 #
 ####################################################################################
@@ -202,6 +210,13 @@ class Slideshow(SmugBase):
     # __init__()
     #
     def __init__(self, debug=False, gallery_id=None, height=None, width=None):
+        '''
+        Args:
+            debug (bool): Enable debug mode
+            gallery_id (str): SmugMug gallery id
+            height (int): Height of target display
+            width (int): Width of target display
+        '''
         super(Slideshow, self).__init__(debug=debug)
 
         self._cache = {}
@@ -264,7 +279,10 @@ class Slideshow(SmugBase):
     #
     def find_best_image_size(self):
         '''
-        find_best_image_size() - Choose the best size image for the set W x H
+        Choose the best size image for the set W x H
+
+        Returns:
+            str: URL to image
         '''
         img = None
         media_content = self._gallery[self._loop_pos].get('media_content')
@@ -296,7 +314,11 @@ class Slideshow(SmugBase):
     #
     def load_gallery(self, gallery_id=None, shuffle=True):
         '''
-        load_gallery(gallery_id, shuffle) - Load the feed for the provided Gallery id
+        Load the feed for the provided Gallery id
+
+        Args:
+            gallery_id (str): SmugMug gallery id to load
+            shuffle (bool): Shuffle the gallery entries. Default: True
         '''
         self._gallery = None
 
@@ -316,7 +338,13 @@ class Slideshow(SmugBase):
     #
     def load_image(self, image_url=None):
         '''
-        load_image(image_url) - Load image data from the provided URL
+        Load image data from the provided URL
+
+        Args:
+            image_url (str): Valid URL to an image file
+
+        Returns:
+            str: Binary string data for loaded content
         '''
         result = None
         if None not in [image_url]:
@@ -335,7 +363,10 @@ class Slideshow(SmugBase):
     #
     def current(self):
         '''
-        current() - return the data for the current image
+        Return the data for the current image
+
+        Returns:
+            str: Binary string data for current image
         '''
 
         result = None
@@ -358,7 +389,10 @@ class Slideshow(SmugBase):
     #
     def next(self):
         '''
-        next() - return the data for the next image
+        Return the data for the next image
+
+        Returns:
+            str: Binary string data for next image
         '''
         self._loop_pos += 1
 
@@ -376,7 +410,10 @@ class Slideshow(SmugBase):
     #
     def previous(self):
         '''
-        previous() - return the data for the next image
+        Return the data for the previous image
+
+        Returns:
+            str: Binary string data for previous image
         '''
         self._loop_pos -= 1
 

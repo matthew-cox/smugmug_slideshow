@@ -1,15 +1,15 @@
-**Last Updated: 2018-05-29 09:28 @matthew-cox**
+**Last Updated: 2018-05-30 20:48 @matthew-cox**
 
 Table of Contents
 =================
-  * [smugmug_slideshow](#smugmug_slideshow)
+  * [SmugMug Slideshow](#smugmug-slideshow)
     * [Requirements](#requirements)
       * [macOS with Pyenv and Virtualenv](#macos-with-pyenv-and-virtualenv)
       * [Raspbian with System Python3](#raspbian-with-system-python3)
       * [Raspbian with Pyenv and Virtualenv](#raspbian-with-pyenv-and-virtualenv)
     * [Run the slide show](#run-the-slide-show)
 
-# smugmug_slideshow
+# SmugMug Slideshow
 
 Image slideshow from a SmugMug RSS Feed using Pygame
 
@@ -78,7 +78,9 @@ To build Python and Pygame, one must install a bunch of build dependencies:
     libswscale-dev
 
     # install the build deps
-    $ sudo apt-get install $(grep -v '^#' raspbian-build.deps
+    $ sudo apt-get install $(grep -v '^#' raspbian-build.deps)
+
+After the build deps are installed: follow the [macOS instructions](#macos-with-pyenv-and-virtualenv) above.
 
 ## Run the slide show
 
