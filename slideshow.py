@@ -126,12 +126,12 @@ def init_fonts():
 #
 # draw_image()
 #
-def draw_image(surface=display.get_surface(), image_file=None):
+def draw_image(surface=None, image_file=None):
     '''
     Draw the provided image on the global display
 
     Args:
-        surface (pygame.display): On which display to draw. Default: display.get_surface()
+        surface (pygame.display): On which display to draw.
         image_file (str or buffer): File path on disk or binary buffer
 
     Returns:
@@ -139,12 +139,15 @@ def draw_image(surface=display.get_surface(), image_file=None):
     '''
     update_display = False
 
-    if None not in [display, image_file]:
+    surface = display.get_surface() if None in [surface] else surface
+
+    if None not in [surface, image_file]:
 
         # pylint: disable=bare-except
         try:
             picture = image.load(image_file)
 
+            # clear the previous displayed image
             surface.fill(pygame.Color('black'))
             imagepos = picture.get_rect()
             imagepos.centerx = surface.get_rect().centerx
