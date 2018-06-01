@@ -1,4 +1,4 @@
-**Last Updated: 2018-05-30 20:48 @matthew-cox**
+**Last Updated: 2018-05-31 20:33 @matthew-cox**
 
 Table of Contents
 =================
@@ -7,6 +7,7 @@ Table of Contents
       * [macOS with Pyenv and Virtualenv](#macos-with-pyenv-and-virtualenv)
       * [Raspbian with System Python3](#raspbian-with-system-python3)
       * [Raspbian with Pyenv and Virtualenv](#raspbian-with-pyenv-and-virtualenv)
+    * [Commandline Options](#commandline-options)
     * [Run the slide show](#run-the-slide-show)
 
 # SmugMug Slideshow
@@ -82,7 +83,21 @@ To build Python and Pygame, one must install a bunch of build dependencies:
 
 After the build deps are installed: follow the [macOS instructions](#macos-with-pyenv-and-virtualenv) above.
 
+## Commandline Options
+
+    $ ./slideshow.py -h
+    usage: slideshow.py [-h] -g GALLERY_ID [-l {debug,info,warning,error,critical}]
+
+    Run a slideshow of a SmugMug gallery
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -g GALLERY_ID, --gallery-id GALLERY_ID
+                            Gallery Id to display
+      -l {debug,info,warning,error,critical}, --log-level {debug,info,warning,error,critical}
+                            Logging verbosity. Default: WARNING
+
 ## Run the slide show
 
-    $ ./slideshow.py
+    $ ./slideshow.py -g
 

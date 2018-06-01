@@ -8,7 +8,7 @@ Run a SmugMug Slideshow
 # Standard Imports
 #
 from __future__ import absolute_import, division, print_function, unicode_literals
-# import argparse
+import argparse
 from datetime import date, datetime
 import json
 import logging
@@ -124,6 +124,89 @@ def init_fonts():
 #
 ##############################################################################
 #
+# scale_picture()
+#
+def scale_image(img=None, size=None):
+    '''
+    Take a loaded image and scale it to the max size that will fit in the width x height provided
+        while preserving the aspect ratio of the original.
+
+    Inspiration fron: https://www.pygame.org/pcr/transform_scale/index.php
+
+    Args:
+        picture (pygame.image): The image to scale
+        size (set): Two member set of width and height
+
+    Return:
+        pygame.image: Image result (might be unchanged)
+
+    Raises:
+        RuntimeError: If any arguments are missing
+    '''
+
+    if None in [img, size]:
+        raise RuntimeError("Missing an argument!")
+
+    img_w, img_h = img.get_size()
+    target_w, target_h = size
+
+    new_w = new_h = None
+
+    new_image = img
+
+    # pick which way to scale
+    if img_w >= img_h:
+        # fit to width
+        scale_factor = img_w / float(target_w)
+        _get_logger().debug("Width scale factor is '%i'", scale_factor)
+
+        new_h = scale_factor * img_h
+        _get_logger().debug("Height scaled from '%i' to '%i'", img_h, new_h)
+
+        if new_h > target_h:
+            _get_logger().debug("New height is too big ('%i' > '%i')", new_h, target_h)
+
+            scale_factor = target_h / float(img_h)
+            _get_logger().debug("Width scale factor is now '%i'", scale_factor)
+
+            new_w = scale_factor * img_w
+            _get_logger().debug("Width scaled from '%i' to '%i'", img_w, new_w)
+            new_h = target_h
+        else:
+            _get_logger().info("Width scaled from '%i' to '%i'", img_w, target_w)
+            new_w = target_w
+    else:
+        # fit to height
+        scale_factor = img_w / float(target_h)
+        _get_logger().debug("Height scale factor is '%i'", scale_factor)
+
+        new_w = scale_factor * img_w
+        _get_logger().debug("Width scaled from '%i' to '%i'", img_w, new_w)
+
+        if new_w > target_w:
+            _get_logger().debug("New width is too big ('%i' > '%i')", new_w, target_w)
+
+            scale_factor = new_w / float(img_w)
+            _get_logger().debug("Height scale factor is now '%i'", scale_factor)
+
+            new_w = target_w
+            new_h = scale_factor * img_h
+            _get_logger().debug("Height scaled from '%i' to '%i'", img_h, new_h)
+        else:
+            _get_logger().debug("Height scaled from '%i' to '%i'", img_h, target_h)
+            new_h = target_h
+
+    if (new_h == img_h) or (new_w == img_w):
+        _get_logger().info("No scale!")
+    else:
+        _get_logger().info("Scaling to new dimensions (%i, %i)", new_w, new_h)
+        new_image = pygame.transform.scale(img, (int(new_w), int(new_h)))
+
+    return new_image
+
+#
+##############################################################################
+#
 # draw_image()
 #
 def draw_image(surface=None, image_file=None):
@@ -146,6 +229,8 @@ def draw_image(surface=None, image_file=None):
         # pylint: disable=bare-except
         try:
             picture = image.load(image_file)
+
+            picture = scale_image(img=picture, size=surface.get_size())
 
             # clear the previous displayed image
             surface.fill(pygame.Color('black'))
@@ -207,13 +292,43 @@ def draw_multiline_text(surface=None, text=None, pos=None, font=None, color=pyga
 #
 # main()
 #
+def handle_arguments():
+    '''
+    Parse command line arguments
+
+    Returns:
+        argparse.Namespace: Representation of provided arguments
+    '''
+    #
+    # Handle CLI args
+    #
+    parser = argparse.ArgumentParser(description='Run a slideshow of a SmugMug gallery')
+
+    # add arguments
+    parser.add_argument('-g', '--gallery-id', action='store', required=True,
+                        help='Gallery Id to display', default=GALLERY_ID)
+
+    parser.add_argument('-l', '--log-level', action='store', required=False,
+                        choices=["debug", "info", "warning", "error", "critical"],
+                        default=DEFAULT_LOG_LEVEL,
+                        help='Logging verbosity. Default: {}'.format(DEFAULT_LOG_LEVEL))
+
+    return parser.parse_args()
+#
+##############################################################################
+#
+# main()
+#
 def main():
     '''
     Run the slideshow
     '''
+
+    args = handle_arguments()
+
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
-                        level=getattr(logging, DEFAULT_LOG_LEVEL))
+                        level=getattr(logging, args.log_level.upper()))
 
     # pylint: disable=no-member
     pygame.init()
@@ -223,7 +338,7 @@ def main():
 
     info = display.Info()
 
-    slide_show = Slideshow(gallery_id=GALLERY_ID, height=info.current_h, width=info.current_w)
+    slide_show = Slideshow(gallery_id=args.gallery_id, height=info.current_h, width=info.current_w)
 
     # init fonts
     fonts = init_fonts()

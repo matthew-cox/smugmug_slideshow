@@ -288,18 +288,26 @@ class Slideshow(SmugBase):
         media_content = self._gallery[self._loop_pos].get('media_content')
         self._logger.info("Searching for an image...")
         if None not in [media_content]:
+            # which dimension do we care about more?
+            horizontal = False
+            closest = 10000000
 
             for image in media_content:
                 self._logger.debug(self._json_dump(image, True))
+                horizontal = int(image.get('width')) >= int(image.get('height'))
 
-                # sometimes the crop sizes aren't quite even in both dimensions -
-                # check +/- 15 pixels
-                if (
-                        (self.__width - 15) <= int(image.get('width')) <= (self.__width + 15) or
-                        (self._height - 15) <= int(image.get('height')) <= (self._height + 15)
-                    ):
+                if horizontal:
+                    diff = abs(self.__width - int(image.get('width')))
+                else:
+                    diff = abs(self._height - int(image.get('height')))
+
+                if diff < closest:
+                    closest = diff
+                    self._logger.debug("Found a new match: %s", self._json_dump(image, True))
                     img = image
-                    self._logger.debug("Found a match: %s", self._json_dump(image, True))
+
+                if closest == 0:
+                    self._logger.debug("Found a perfect match: %s", self._json_dump(image, True))
                     break
 
         if None in [img]:
