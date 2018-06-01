@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 from urllib.parse import urlparse
 #
@@ -170,6 +171,7 @@ class SmugRss(SmugBase):
             filtered = []
             for entry in self._recent:
                 link_info = urlparse(entry.get('link'))
+                #      Cetegory   Year    Gallery
                 # ['', 'Travel', '2018', 'Belgium']
                 paths = link_info.path.split('/')
 
@@ -190,6 +192,64 @@ class SmugRss(SmugBase):
         '''str: URL of the loaded feed'''
         return self._site_url
 #
+##############################################################################
+#
+# SmugRssUrl
+#
+class SmugRssGalleryUrl(SmugRss):
+    """SmugRssUrl Feed Class"""
+    #
+    ####################################################################################
+    #
+    # Class variables
+    #
+
+    #
+    ####################################################################################
+    #
+    # __init__()
+    #
+    def __init__(self, debug=False, gallery_url=None):
+        if None in [gallery_url]:
+            raise RuntimeError("Need gallery_url to proceed!")
+
+        parsed = urlparse(gallery_url)
+        site_url = '://'.join([parsed.scheme, parsed.netloc])
+
+        super(SmugRssGalleryUrl, self).__init__(debug=False, site_url=site_url, nickname="FOO")
+
+        self._recent_feed_url = self._find_rss_feed_url(gallery_url)
+    #
+    ####################################################################################
+    #
+    # _find_rss_feed_url()
+    #
+    def _find_rss_feed_url(self, gallery_url=None):
+        '''
+        Search the provided gallery page content for an RSS url
+
+        Args:
+            gallery_url (str): Gallery URL to search
+
+        Returns:
+            str: URL for RSS feed or None
+        '''
+
+        if None not in [gallery_url]:
+            response = requests.get(gallery_url)
+
+            self._logger.info("Response code was '{0}'".format(response.status_code))
+
+            for line in response.text.split("\n"):
+
+                if '<link rel="alternate" type="application/rss+xml"' in line:
+                    match = re.match(r'href="[^"]*"', line, re.)
+                    print(match)
+                    sys.exit(1)
+
+
+
+#
 ####################################################################################
 #
 # pylint: disable=too-many-instance-attributes
@@ -209,11 +269,12 @@ class Slideshow(SmugBase):
     #
     # __init__()
     #
-    def __init__(self, debug=False, gallery_id=None, height=None, width=None):
+    def __init__(self, debug=False, gallery_id=None, gallery_url=None, height=None, width=None):
         '''
         Args:
             debug (bool): Enable debug mode
             gallery_id (str): SmugMug gallery id
+            gallery_url (str): SmugMug gallery URL
             height (int): Height of target display
             width (int): Width of target display
         '''
@@ -230,6 +291,8 @@ class Slideshow(SmugBase):
         # load the gallery RSS - do this last
         self._gallery = None
         self._gallery_id = gallery_id
+        self._gallery_url = gallery_url
+        self._logger.info("Setting URL to '%s'", gallery_url)
         self.load_gallery()
     #
     ##############################################################################
@@ -320,25 +383,33 @@ class Slideshow(SmugBase):
     #
     # load_gallery()
     #
-    def load_gallery(self, gallery_id=None, shuffle=True):
+    def load_gallery(self, gallery_id=None, gallery_url=None, shuffle=True):
         '''
         Load the feed for the provided Gallery id
 
         Args:
             gallery_id (str): SmugMug gallery id to load
+            gallery_url (str): SmugMug gallery URL to load
             shuffle (bool): Shuffle the gallery entries. Default: True
         '''
         self._gallery = None
 
         gallery_id = gallery_id if gallery_id else self._gallery_id
+        gallery_url = gallery_url if gallery_url else self._gallery_url
+        self._logger.info("Setting URL to '%s'", gallery_url)
 
         if None not in [gallery_id]:
             self._logger.info("Loading gallery with id '%s'", gallery_id)
             smugmug = SmugRss(site_url='www.azriel.photo', nickname='azriel')
             self._gallery = smugmug.get_gallery_feed(gallery=gallery_id)
 
-            if shuffle:
-                random.shuffle(self._gallery)
+        if None not in [gallery_url]:
+            self._logger.info("Loading gallery with URL '%s'", gallery_url)
+            smugmug = SmugRssGalleryUrl(gallery_url=gallery_url)
+            self._gallery = smugmug.get_gallery_feed(gallery=gallery_id)
+
+        if self._gallery and shuffle:
+            random.shuffle(self._gallery)
     #
     ##############################################################################
     #

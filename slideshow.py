@@ -305,8 +305,10 @@ def handle_arguments():
     parser = argparse.ArgumentParser(description='Run a slideshow of a SmugMug gallery')
 
     # add arguments
-    parser.add_argument('-g', '--gallery-id', action='store', required=True,
-                        help='Gallery Id to display', default=GALLERY_ID)
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('-g', '--gallery-id', action='store', help='Gallery Id to display')
+    group.add_argument('-u', '--url', action='store', help='URL of Gallery to display')
 
     parser.add_argument('-l', '--log-level', action='store', required=False,
                         choices=["debug", "info", "warning", "error", "critical"],
@@ -338,7 +340,10 @@ def main():
 
     info = display.Info()
 
-    slide_show = Slideshow(gallery_id=args.gallery_id, height=info.current_h, width=info.current_w)
+    slide_show = Slideshow(gallery_id=args.gallery_id, gallery_url=args.url,
+                           height=info.current_h, width=info.current_w)
+
+    sys.exit(0)
 
     # init fonts
     fonts = init_fonts()
