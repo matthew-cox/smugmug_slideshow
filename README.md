@@ -1,4 +1,4 @@
-**Last Updated: 2018-05-31 20:33 @matthew-cox**
+**Last Updated: 2018-06-01 19:58 @matthew-cox**
 
 Table of Contents
 =================
@@ -86,7 +86,8 @@ After the build deps are installed: follow the [macOS instructions](#macos-with-
 ## Commandline Options
 
     $ ./slideshow.py -h
-    usage: slideshow.py [-h] -g GALLERY_ID [-l {debug,info,warning,error,critical}]
+    usage: slideshow.py [-h] (-g GALLERY_ID | -u GALLERY_URL)
+                        [-l {debug,info,warning,error,critical}]
 
     Run a slideshow of a SmugMug gallery
 
@@ -94,10 +95,12 @@ After the build deps are installed: follow the [macOS instructions](#macos-with-
       -h, --help            show this help message and exit
       -g GALLERY_ID, --gallery-id GALLERY_ID
                             Gallery Id to display
+      -u GALLERY_URL, --gallery-url GALLERY_URL
+                            URL of Gallery to display
       -l {debug,info,warning,error,critical}, --log-level {debug,info,warning,error,critical}
                             Logging verbosity. Default: WARNING
 
 ## Run the slide show
 
-    $ ./slideshow.py -g
+    $ ./slideshow.py -u 'https://your-great-site.com/the/best/gallery'
 

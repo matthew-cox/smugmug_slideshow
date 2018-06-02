@@ -42,8 +42,6 @@ DISPLAY_TIME = 45 * 1000
 
 FONT = 'courier'
 
-GALLERY_ID = '159365802_Wp7NDr'
-
 STARTUP_TEXT = """SmugMug Slideshow
 
 [Escape]    Stop the show
@@ -308,7 +306,7 @@ def handle_arguments():
     group = parser.add_mutually_exclusive_group(required=True)
 
     group.add_argument('-g', '--gallery-id', action='store', help='Gallery Id to display')
-    group.add_argument('-u', '--url', action='store', help='URL of Gallery to display')
+    group.add_argument('-u', '--gallery-url', action='store', help='URL of Gallery to display')
 
     parser.add_argument('-l', '--log-level', action='store', required=False,
                         choices=["debug", "info", "warning", "error", "critical"],
@@ -340,10 +338,8 @@ def main():
 
     info = display.Info()
 
-    slide_show = Slideshow(gallery_id=args.gallery_id, gallery_url=args.url,
+    slide_show = Slideshow(gallery_id=args.gallery_id, gallery_url=args.gallery_url,
                            height=info.current_h, width=info.current_w)
-
-    sys.exit(0)
 
     # init fonts
     fonts = init_fonts()

@@ -93,6 +93,7 @@ class SmugRss(SmugBase):
         if None in [site_url, nickname]:
             raise RuntimeError("Need site_url and nickname to proceed!")
 
+        self._gallery_url = None
         self._entries = None
         self._nickname = nickname
         self._recent = None
@@ -102,7 +103,7 @@ class SmugRss(SmugBase):
     #
     ####################################################################################
     #
-    # get_recent()
+    # get_gallery_feed()
     #
     def get_gallery_feed(self, gallery=None, category=None, year=None):
         '''
@@ -115,32 +116,41 @@ class SmugRss(SmugBase):
 
         Returns:
             list: List of matching galleries from the feed
+
+        Raises:
+            RuntimeError: if missing arguments needed to execute requests
         '''
         results = None
 
+        if [gallery, self._gallery_url].count(None) == 2:
+            raise RuntimeError("Need either gallery id OR gallery URL")
+
         if None not in [gallery]:
             gallery_url = self.GALLERY_URL.format(url=self.site_url, gallery=gallery)
-            results = feedparser.parse(gallery_url).get('entries')
+        else:
+            gallery_url = self._gallery_url
 
-            if None not in [year]:
-                filtered = []
+        results = feedparser.parse(gallery_url).get('entries')
 
-                for entry in results:
-                    if str(entry.get('published_parsed')[0]) == str(year):
-                        filtered.append(entry)
+        if None not in [year]:
+            filtered = []
 
-                results = filtered
+            for entry in results:
+                if str(entry.get('published_parsed')[0]) == str(year):
+                    filtered.append(entry)
 
-            if None not in [category]:
-                filtered = []
-                for entry in results:
-                    link_info = urlparse(entry.get('link'))
-                    # ['', 'Travel', '2018', 'Belgium']
-                    paths = link_info.path.split('/')
+            results = filtered
 
-                    if paths[1] == category:
-                        filtered.append(entry)
-                results = filtered
+        if None not in [category]:
+            filtered = []
+            for entry in results:
+                link_info = urlparse(entry.get('link'))
+                # ['', 'Travel', '2018', 'Belgium']
+                paths = link_info.path.split('/')
+
+                if paths[1] == category:
+                    filtered.append(entry)
+            results = filtered
         return results
     #
     ####################################################################################
@@ -215,10 +225,11 @@ class SmugRssGalleryUrl(SmugRss):
 
         parsed = urlparse(gallery_url)
         site_url = '://'.join([parsed.scheme, parsed.netloc])
-
+        # this is bad form, but need the site_url for the super constructor
         super(SmugRssGalleryUrl, self).__init__(debug=False, site_url=site_url, nickname="FOO")
 
-        self._recent_feed_url = self._find_rss_feed_url(gallery_url)
+        # extract the RSS URL from the page content
+        self._gallery_url = ''.join([site_url, self._find_rss_feed_url(gallery_url)])
     #
     ####################################################################################
     #
@@ -234,21 +245,28 @@ class SmugRssGalleryUrl(SmugRss):
         Returns:
             str: URL for RSS feed or None
         '''
+        result = None
 
         if None not in [gallery_url]:
             response = requests.get(gallery_url)
 
-            self._logger.info("Response code was '{0}'".format(response.status_code))
+            self._logger.info("Response code was '%s'", response.status_code)
 
             for line in response.text.split("\n"):
 
                 if '<link rel="alternate" type="application/rss+xml"' in line:
-                    match = re.match(r'href="[^"]*"', line, re.)
-                    print(match)
-                    sys.exit(1)
-
-
-
+                    match = re.search(r'href="([^"]*)"', line, re.I)
+                    if match:
+                        result = match.group(1)
+                        break
+        return result
+    #
+    ####################################################################################
+    #
+    # _find_rss_feed_url()
+    #
+    def get_recent(self, category=None, year=None):
+        raise NotImplementedError("Does not apply to a gallery!")
 #
 ####################################################################################
 #
@@ -269,6 +287,7 @@ class Slideshow(SmugBase):
     #
     # __init__()
     #
+    # pylint: disable=too-many-arguments
     def __init__(self, debug=False, gallery_id=None, gallery_url=None, height=None, width=None):
         '''
         Args:
@@ -406,7 +425,7 @@ class Slideshow(SmugBase):
         if None not in [gallery_url]:
             self._logger.info("Loading gallery with URL '%s'", gallery_url)
             smugmug = SmugRssGalleryUrl(gallery_url=gallery_url)
-            self._gallery = smugmug.get_gallery_feed(gallery=gallery_id)
+            self._gallery = smugmug.get_gallery_feed()
 
         if self._gallery and shuffle:
             random.shuffle(self._gallery)
