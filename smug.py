@@ -288,10 +288,12 @@ class Slideshow(SmugBase):
     # __init__()
     #
     # pylint: disable=too-many-arguments
-    def __init__(self, debug=False, gallery_id=None, gallery_url=None, height=None, width=None):
+    def __init__(self, debug=False, downscale=False, gallery_id=None, gallery_url=None, height=None,
+                 width=None):
         '''
         Args:
             debug (bool): Enable debug mode
+            downscale (bool): Find images larger than display and downscale them
             gallery_id (str): SmugMug gallery id
             gallery_url (str): SmugMug gallery URL
             height (int): Height of target display
@@ -301,6 +303,8 @@ class Slideshow(SmugBase):
 
         self._cache = {}
         self._cache_size = 0
+
+        self._downscale = downscale
 
         self._height = height
         self.__width = width
@@ -368,6 +372,10 @@ class Slideshow(SmugBase):
         '''
         img = None
         media_content = self._gallery[self._loop_pos].get('media_content')
+        if self._downscale:
+            # search from large to small
+            media_content = list(reversed(media_content))
+
         self._logger.info("Searching for an image...")
         if None not in [media_content]:
             # which dimension do we care about more?
@@ -379,9 +387,17 @@ class Slideshow(SmugBase):
                 horizontal = int(image.get('width')) >= int(image.get('height'))
 
                 if horizontal:
-                    diff = abs(self.__width - int(image.get('width')))
+                    diff = self.__width - int(image.get('width'))
                 else:
-                    diff = abs(self._height - int(image.get('height')))
+                    diff = self._height - int(image.get('height'))
+
+                # NOTE: a positive diff indicates an image smaller than the display, end search if
+                # in downscale mode
+                if self._downscale and diff > 0 :
+                    self._logger.info("Image is smaller than display. Skipping...")
+                    break
+
+                diff = abs(diff)
 
                 if diff < closest:
                     closest = diff
