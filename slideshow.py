@@ -42,8 +42,6 @@ DISPLAY_TIME = 45 * 1000
 
 FONT = 'courier'
 
-GALLERY_ID = '159365802_Wp7NDr'
-
 STARTUP_TEXT = """SmugMug Slideshow
 
 [Escape]    Stop the show
@@ -177,7 +175,7 @@ def scale_image(img=None, size=None):
             new_w = target_w
     else:
         # fit to height
-        scale_factor = img_w / float(target_h)
+        scale_factor = img_h / float(target_h)
         _get_logger().debug("Height scale factor is '%i'", scale_factor)
 
         new_w = scale_factor * img_w
@@ -305,8 +303,19 @@ def handle_arguments():
     parser = argparse.ArgumentParser(description='Run a slideshow of a SmugMug gallery')
 
     # add arguments
-    parser.add_argument('-g', '--gallery-id', action='store', required=True,
-                        help='Gallery Id to display', default=GALLERY_ID)
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('-g', '--gallery-id', action='store', help='Gallery Id to display')
+    group.add_argument('-u', '--gallery-url', action='store', help='URL of Gallery to display')
+
+    parser.add_argument("--debug", action='store_true', required=False, default=False,
+                        help="Enable debug mode. Increases verbosity and shortens display time.")
+
+    parser.add_argument("--display-time", action='store', required=False, default=DISPLAY_TIME,
+                        help="Time in milliseconds to display image. Default: {}".format(DISPLAY_TIME))
+
+    parser.add_argument('-d', '--downscale-only', action='store_true', required=False,
+                        help='Do not upscale images.', default=False)
 
     parser.add_argument('-l', '--log-level', action='store', required=False,
                         choices=["debug", "info", "warning", "error", "critical"],
@@ -326,6 +335,10 @@ def main():
 
     args = handle_arguments()
 
+    if args.debug:
+        args.log_level = 'INFO'
+        args.display_time = 5 * 1000
+
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
                         level=getattr(logging, args.log_level.upper()))
@@ -338,7 +351,9 @@ def main():
 
     info = display.Info()
 
-    slide_show = Slideshow(gallery_id=args.gallery_id, height=info.current_h, width=info.current_w)
+    slide_show = Slideshow(gallery_id=args.gallery_id, gallery_url=args.gallery_url,
+                           downscale=args.downscale_only, height=info.current_h,
+                           width=info.current_w)
 
     # init fonts
     fonts = init_fonts()
@@ -361,7 +376,7 @@ def main():
 
     # draw an image every so often by sending an event on an interval
     # pylint: disable=no-member
-    time.set_timer(pygame.USEREVENT, DISPLAY_TIME)
+    time.set_timer(pygame.USEREVENT, args.display_time)
 
     # the event loop
     while 1:

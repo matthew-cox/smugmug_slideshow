@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 from urllib.parse import urlparse
 #
@@ -92,6 +93,7 @@ class SmugRss(SmugBase):
         if None in [site_url, nickname]:
             raise RuntimeError("Need site_url and nickname to proceed!")
 
+        self._gallery_url = None
         self._entries = None
         self._nickname = nickname
         self._recent = None
@@ -101,7 +103,7 @@ class SmugRss(SmugBase):
     #
     ####################################################################################
     #
-    # get_recent()
+    # get_gallery_feed()
     #
     def get_gallery_feed(self, gallery=None, category=None, year=None):
         '''
@@ -114,32 +116,41 @@ class SmugRss(SmugBase):
 
         Returns:
             list: List of matching galleries from the feed
+
+        Raises:
+            RuntimeError: if missing arguments needed to execute requests
         '''
         results = None
 
+        if [gallery, self._gallery_url].count(None) == 2:
+            raise RuntimeError("Need either gallery id OR gallery URL")
+
         if None not in [gallery]:
             gallery_url = self.GALLERY_URL.format(url=self.site_url, gallery=gallery)
-            results = feedparser.parse(gallery_url).get('entries')
+        else:
+            gallery_url = self._gallery_url
 
-            if None not in [year]:
-                filtered = []
+        results = feedparser.parse(gallery_url).get('entries')
 
-                for entry in results:
-                    if str(entry.get('published_parsed')[0]) == str(year):
-                        filtered.append(entry)
+        if None not in [year]:
+            filtered = []
 
-                results = filtered
+            for entry in results:
+                if str(entry.get('published_parsed')[0]) == str(year):
+                    filtered.append(entry)
 
-            if None not in [category]:
-                filtered = []
-                for entry in results:
-                    link_info = urlparse(entry.get('link'))
-                    # ['', 'Travel', '2018', 'Belgium']
-                    paths = link_info.path.split('/')
+            results = filtered
 
-                    if paths[1] == category:
-                        filtered.append(entry)
-                results = filtered
+        if None not in [category]:
+            filtered = []
+            for entry in results:
+                link_info = urlparse(entry.get('link'))
+                # ['', 'Travel', '2018', 'Belgium']
+                paths = link_info.path.split('/')
+
+                if paths[1] == category:
+                    filtered.append(entry)
+            results = filtered
         return results
     #
     ####################################################################################
@@ -170,6 +181,7 @@ class SmugRss(SmugBase):
             filtered = []
             for entry in self._recent:
                 link_info = urlparse(entry.get('link'))
+                #      Cetegory   Year    Gallery
                 # ['', 'Travel', '2018', 'Belgium']
                 paths = link_info.path.split('/')
 
@@ -190,6 +202,72 @@ class SmugRss(SmugBase):
         '''str: URL of the loaded feed'''
         return self._site_url
 #
+##############################################################################
+#
+# SmugRssUrl
+#
+class SmugRssGalleryUrl(SmugRss):
+    """SmugRssUrl Feed Class"""
+    #
+    ####################################################################################
+    #
+    # Class variables
+    #
+
+    #
+    ####################################################################################
+    #
+    # __init__()
+    #
+    def __init__(self, debug=False, gallery_url=None):
+        if None in [gallery_url]:
+            raise RuntimeError("Need gallery_url to proceed!")
+
+        parsed = urlparse(gallery_url)
+        site_url = '://'.join([parsed.scheme, parsed.netloc])
+        # this is bad form, but need the site_url for the super constructor
+        super(SmugRssGalleryUrl, self).__init__(debug=False, site_url=site_url, nickname="FOO")
+
+        # extract the RSS URL from the page content
+        self._gallery_url = ''.join([site_url, self._find_rss_feed_url(gallery_url)])
+    #
+    ####################################################################################
+    #
+    # _find_rss_feed_url()
+    #
+    def _find_rss_feed_url(self, gallery_url=None):
+        '''
+        Search the provided gallery page content for an RSS url
+
+        Args:
+            gallery_url (str): Gallery URL to search
+
+        Returns:
+            str: URL for RSS feed or None
+        '''
+        result = None
+
+        if None not in [gallery_url]:
+            response = requests.get(gallery_url)
+
+            self._logger.info("Response code was '%s'", response.status_code)
+
+            for line in response.text.split("\n"):
+
+                if '<link rel="alternate" type="application/rss+xml"' in line:
+                    match = re.search(r'href="([^"]*)"', line, re.I)
+                    if match:
+                        result = match.group(1)
+                        break
+        return result
+    #
+    ####################################################################################
+    #
+    # _find_rss_feed_url()
+    #
+    def get_recent(self, category=None, year=None):
+        raise NotImplementedError("Does not apply to a gallery!")
+#
 ####################################################################################
 #
 # pylint: disable=too-many-instance-attributes
@@ -209,11 +287,15 @@ class Slideshow(SmugBase):
     #
     # __init__()
     #
-    def __init__(self, debug=False, gallery_id=None, height=None, width=None):
+    # pylint: disable=too-many-arguments
+    def __init__(self, debug=False, downscale=False, gallery_id=None, gallery_url=None, height=None,
+                 width=None):
         '''
         Args:
             debug (bool): Enable debug mode
+            downscale (bool): Find images larger than display and downscale them
             gallery_id (str): SmugMug gallery id
+            gallery_url (str): SmugMug gallery URL
             height (int): Height of target display
             width (int): Width of target display
         '''
@@ -221,6 +303,8 @@ class Slideshow(SmugBase):
 
         self._cache = {}
         self._cache_size = 0
+
+        self._downscale = downscale
 
         self._height = height
         self.__width = width
@@ -230,6 +314,8 @@ class Slideshow(SmugBase):
         # load the gallery RSS - do this last
         self._gallery = None
         self._gallery_id = gallery_id
+        self._gallery_url = gallery_url
+        self._logger.info("Setting URL to '%s'", gallery_url)
         self.load_gallery()
     #
     ##############################################################################
@@ -286,6 +372,10 @@ class Slideshow(SmugBase):
         '''
         img = None
         media_content = self._gallery[self._loop_pos].get('media_content')
+        if self._downscale:
+            # search from large to small
+            media_content = list(reversed(media_content))
+
         self._logger.info("Searching for an image...")
         if None not in [media_content]:
             # which dimension do we care about more?
@@ -297,9 +387,17 @@ class Slideshow(SmugBase):
                 horizontal = int(image.get('width')) >= int(image.get('height'))
 
                 if horizontal:
-                    diff = abs(self.__width - int(image.get('width')))
+                    diff = self.__width - int(image.get('width'))
                 else:
-                    diff = abs(self._height - int(image.get('height')))
+                    diff = self._height - int(image.get('height'))
+
+                # NOTE: a positive diff indicates an image smaller than the display, end search if
+                # in downscale mode
+                if self._downscale and diff > 0 :
+                    self._logger.info("Image is smaller than display. Skipping...")
+                    break
+
+                diff = abs(diff)
 
                 if diff < closest:
                     closest = diff
@@ -320,25 +418,33 @@ class Slideshow(SmugBase):
     #
     # load_gallery()
     #
-    def load_gallery(self, gallery_id=None, shuffle=True):
+    def load_gallery(self, gallery_id=None, gallery_url=None, shuffle=True):
         '''
         Load the feed for the provided Gallery id
 
         Args:
             gallery_id (str): SmugMug gallery id to load
+            gallery_url (str): SmugMug gallery URL to load
             shuffle (bool): Shuffle the gallery entries. Default: True
         '''
         self._gallery = None
 
         gallery_id = gallery_id if gallery_id else self._gallery_id
+        gallery_url = gallery_url if gallery_url else self._gallery_url
+        self._logger.info("Setting URL to '%s'", gallery_url)
 
         if None not in [gallery_id]:
             self._logger.info("Loading gallery with id '%s'", gallery_id)
             smugmug = SmugRss(site_url='www.azriel.photo', nickname='azriel')
             self._gallery = smugmug.get_gallery_feed(gallery=gallery_id)
 
-            if shuffle:
-                random.shuffle(self._gallery)
+        if None not in [gallery_url]:
+            self._logger.info("Loading gallery with URL '%s'", gallery_url)
+            smugmug = SmugRssGalleryUrl(gallery_url=gallery_url)
+            self._gallery = smugmug.get_gallery_feed()
+
+        if self._gallery and shuffle:
+            random.shuffle(self._gallery)
     #
     ##############################################################################
     #
