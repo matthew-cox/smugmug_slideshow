@@ -162,10 +162,11 @@ def resize_contain(the_image=None, size=None):
     """
     img_format = the_image.format
     img = the_image.copy()
-    img.thumbnail((size[0], size[1]), PIL.Image.HAMMING)
+    # NOTE: LANCZOS might be another good filter choice
+    img.thumbnail(size, PIL.Image.HAMMING)
 
     # FIll with black. Non-alpha mode
-    background = PIL.Image.new('RGB', (size[0], size[1]), (0, 0, 0))
+    background = PIL.Image.new('RGB', size, (0, 0, 0))
     img_position = (
         int(math.ceil((size[0] - img.size[0]) / 2)),
         int(math.ceil((size[1] - img.size[1]) / 2))
