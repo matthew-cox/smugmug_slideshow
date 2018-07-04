@@ -32,8 +32,6 @@ import pygame
 from pygame import display, image, time
 # from pygame.locals import *
 
-# from resizeimage import resizeimage
-
 #
 # Ensure ./lib is in the lib path for local includes
 #
@@ -73,7 +71,6 @@ def _get_logger():
 
     Returns:
         logging.logger: Instance of logger for name of current file
-
     '''
     return logging.getLogger(Path(__file__).resolve().name)
 #
