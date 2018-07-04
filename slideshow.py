@@ -177,9 +177,9 @@ def resize_contain(the_image=None, size=None):
 #
 ##############################################################################
 #
-# scale_image_new()
+# scale_image()
 #
-def scale_image_new(img=None, size=None):
+def scale_image(img=None, size=None):
     '''
     Take loaded image bytes and scale it to the max size that will fit in the width x height
         provided while preserving the aspect ratio of the original.
@@ -222,89 +222,6 @@ def scale_image_new(img=None, size=None):
 #
 ##############################################################################
 #
-# scale_picture()
-#
-def scale_image(img=None, size=None):
-    '''
-    Take a loaded image and scale it to the max size that will fit in the width x height provided
-        while preserving the aspect ratio of the original.
-
-    Inspiration from: https://www.pygame.org/pcr/transform_scale/index.php
-
-    Args:
-        picture (pygame.image): The image to scale
-        size (set): Two member set of width and height
-
-    Return:
-        pygame.image: Image result (might be unchanged)
-
-    Raises:
-        RuntimeError: If any arguments are missing
-    '''
-
-    if None in [img, size]:
-        raise RuntimeError("Missing an argument!")
-
-    img_w, img_h = img.get_size()
-    target_w, target_h = size
-
-    new_w = new_h = None
-
-    new_image = img
-
-    # pick which way to scale
-    if img_w >= img_h:
-        # fit to width
-        scale_factor = img_w / float(target_w)
-        _get_logger().debug("Width scale factor is '%i'", scale_factor)
-
-        new_h = scale_factor * img_h
-        _get_logger().debug("Height scaled from '%i' to '%i'", img_h, new_h)
-
-        if new_h > target_h:
-            _get_logger().debug("New height is too big ('%i' > '%i')", new_h, target_h)
-
-            scale_factor = target_h / float(img_h)
-            _get_logger().debug("Width scale factor is now '%i'", scale_factor)
-
-            new_w = scale_factor * img_w
-            _get_logger().debug("Width scaled from '%i' to '%i'", img_w, new_w)
-            new_h = target_h
-        else:
-            _get_logger().info("Width scaled from '%i' to '%i'", img_w, target_w)
-            new_w = target_w
-    else:
-        # fit to height
-        scale_factor = img_h / float(target_h)
-        _get_logger().debug("Height scale factor is '%i'", scale_factor)
-
-        new_w = scale_factor * img_w
-        _get_logger().debug("Width scaled from '%i' to '%i'", img_w, new_w)
-
-        if new_w > target_w:
-            _get_logger().debug("New width is too big ('%i' > '%i')", new_w, target_w)
-
-            scale_factor = new_w / float(img_w)
-            _get_logger().debug("Height scale factor is now '%i'", scale_factor)
-
-            new_w = target_w
-            new_h = scale_factor * img_h
-            _get_logger().debug("Height scaled from '%i' to '%i'", img_h, new_h)
-        else:
-            _get_logger().debug("Height scaled from '%i' to '%i'", img_h, target_h)
-            new_h = target_h
-
-    if (new_h == img_h) or (new_w == img_w):
-        _get_logger().info("No scale!")
-    else:
-        _get_logger().info("Scaling to new dimensions (%i, %i)", new_w, new_h)
-        new_image = pygame.transform.scale(img, (int(new_w), int(new_h)))
-
-    return new_image
-
-#
-##############################################################################
-#
 # draw_image()
 #
 def draw_image(surface=None, image_file=None):
@@ -329,10 +246,7 @@ def draw_image(surface=None, image_file=None):
         _get_logger().info("Trying to scale the image...")
         # pylint: disable=bare-except
         try:
-            # picture = image.load(image_file)
-
-            # picture = scale_image(img=picture, size=surface.get_size())
-            picture = scale_image_new(img=image_file, size=surface.get_size())
+            picture = scale_image(img=image_file, size=surface.get_size())
 
             # clear the previous displayed image
             surface.fill(pygame.Color('black'))
@@ -413,10 +327,11 @@ def handle_arguments():
     group.add_argument('-u', '--gallery-url', action='store', help='URL of Gallery to display')
 
     parser.add_argument("--debug", action='store_true', required=False, default=False,
-                        help="Enable debug mode. Increases verbosity and shortens display time.")
+                        help="Enable debug mode. Increases verbosity and shortens show time.")
 
     parser.add_argument('-d', '--downscale-only', action='store_true', required=False,
-                        help='Do not upscale images.', default=False)
+                        help=('Enable downscale mode. Prefer images larger than the display. '
+                              'Default: False'), default=False)
 
     parser.add_argument('-l', '--log-level', action='store', required=False,
                         choices=["debug", "info", "warning", "error", "critical"],
@@ -441,7 +356,8 @@ def main():
 
     if args.debug:
         args.log_level = 'INFO'
-        args.show_time = 5 * 1000
+        # 5 seconds is too fast once images are cached: one cannot interupt easily
+        args.show_time = 10 * 1000
 
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
