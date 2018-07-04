@@ -12,19 +12,33 @@ import argparse
 from datetime import date, datetime
 import json
 import logging
+import math
 import os
+try:
+    from pathlib import Path
+except ModuleNotFoundError:
+    from pathlib2 import Path
 import sys
 #
 # Non-standard imports
 #
 from io import BytesIO
+
+import PIL
+# pylint: disable=unused-import
+from PIL import Image
+
 import pygame
 from pygame import display, image, time
 # from pygame.locals import *
+
+# from resizeimage import resizeimage
+
 #
-# Ensure . is in the lib path for local includes
+# Ensure ./lib is in the lib path for local includes
 #
-sys.path.append(os.path.realpath('.'))
+LIB_PATH = Path(__file__).resolve().parent / 'lib'
+sys.path.append(str(LIB_PATH))
 #
 # pylint: disable=wrong-import-position
 # local directory imports here
@@ -35,7 +49,7 @@ from smug import Slideshow
 #
 # Global Variables
 #
-DEFAULT_LOG_LEVEL = 'WARNING'
+DEFAULT_LOG_LEVEL = 'WARNING' if not os.environ.get('PY_LOG_LEVEL') else os.environ['PY_LOG_LEVEL']
 
 # How long to display each image (in seconds)
 DISPLAY_TIME = 45 * 1000
@@ -54,15 +68,26 @@ STARTUP_TEXT = """SmugMug Slideshow
 # _get_logger() - reusable code to get the correct logger by name
 #
 def _get_logger():
-    '''_get_logger() - reuable code to get the correct logger by name'''
-    return logging.getLogger(os.path.basename(__file__))
+    '''
+    Reusable code to get the correct logger by name of current file
+
+    Returns:
+        logging.logger: Instance of logger for name of current file
+
+    '''
+    return logging.getLogger(Path(__file__).resolve().name)
 #
 ##############################################################################
 #
 # _json_dump() - Little output to DRY
 #
 def _json_dump(the_thing, pretty=False):
-    '''_json_dump() - Little output to DRY'''
+    '''
+    Reusable JSON dumping code
+
+    Returns:
+        str: JSON string representation suitable for print'ing
+    '''
     output = None
     if pretty:
         output = json.dumps(the_thing, default=_json_serial, sort_keys=True, indent=4,
@@ -122,6 +147,83 @@ def init_fonts():
 #
 ##############################################################################
 #
+# resize_contain()
+#
+def resize_contain(the_image=None, size=None):
+    """
+    Resize image according to size.
+
+    Inspiration fron:
+    https://github.com/charlesthk/python-resize-image/blob/master/resizeimage/resizeimage.py#L98
+
+    Args:
+        image (PIL.Image): A Pillow image instance
+        size (list): A list of two integers [width, height]
+
+    Returns:
+        PIL.Image: Scaled image results
+    """
+    img_format = the_image.format
+    img = the_image.copy()
+    img.thumbnail((size[0], size[1]), PIL.Image.HAMMING)
+
+    # FIll with black. Non-alpha mode
+    background = PIL.Image.new('RGB', (size[0], size[1]), (0, 0, 0))
+    img_position = (
+        int(math.ceil((size[0] - img.size[0]) / 2)),
+        int(math.ceil((size[1] - img.size[1]) / 2))
+    )
+    background.paste(img, img_position)
+    background.format = img_format
+    return background
+#
+##############################################################################
+#
+# scale_image_new()
+#
+def scale_image_new(img=None, size=None):
+    '''
+    Take loaded image bytes and scale it to the max size that will fit in the width x height
+        provided while preserving the aspect ratio of the original.
+
+    Inspiration fron:
+    https://github.com/charlesthk/python-resize-image/blob/master/resizeimage/resizeimage.py#L98
+
+    Args:
+        picture (BytesIO): The image data to scale
+        size (set): Two member set of width and height
+
+    Return:
+        pygame.image: Image result (might be unchanged)
+
+    Raises:
+        RuntimeError: If any arguments are missing
+    '''
+
+    # Make a copy, which is stupid, but everything that touches img closes it
+    tmp_img = BytesIO(img.getvalue())
+    result = pygame.image.load(tmp_img)
+
+    if None in [img, size]:
+        raise RuntimeError("Missing an argument!")
+
+    scaled = None
+    # pylint: disable=broad-except
+    try:
+        with PIL.Image.open(img) as pil_image:
+            scaled = resize_contain(pil_image, size)
+    except Exception as err:
+        _get_logger().error("Scaling failed: '%s'", err)
+
+    try:
+        result = pygame.image.fromstring(scaled.tobytes(), scaled.size, scaled.mode)
+    except Exception as err:
+        _get_logger().error("Loading failed: '%s'", err)
+
+    return result
+#
+##############################################################################
+#
 # scale_picture()
 #
 def scale_image(img=None, size=None):
@@ -129,7 +231,7 @@ def scale_image(img=None, size=None):
     Take a loaded image and scale it to the max size that will fit in the width x height provided
         while preserving the aspect ratio of the original.
 
-    Inspiration fron: https://www.pygame.org/pcr/transform_scale/index.php
+    Inspiration from: https://www.pygame.org/pcr/transform_scale/index.php
 
     Args:
         picture (pygame.image): The image to scale
@@ -216,19 +318,23 @@ def draw_image(surface=None, image_file=None):
         image_file (str or buffer): File path on disk or binary buffer
 
     Returns:
-        True or False indicating sucess and that the display should be updated
+        bool: True or False indicating sucess and that the display should be updated
     '''
     update_display = False
 
     surface = display.get_surface() if None in [surface] else surface
 
-    if None not in [surface, image_file]:
+    if None in [surface, image_file]:
+        _get_logger().warning("Missing required argument. No-op.")
 
+    else:
+        _get_logger().info("Trying to scale the image...")
         # pylint: disable=bare-except
         try:
-            picture = image.load(image_file)
+            # picture = image.load(image_file)
 
-            picture = scale_image(img=picture, size=surface.get_size())
+            # picture = scale_image(img=picture, size=surface.get_size())
+            picture = scale_image_new(img=image_file, size=surface.get_size())
 
             # clear the previous displayed image
             surface.fill(pygame.Color('black'))
@@ -311,16 +417,16 @@ def handle_arguments():
     parser.add_argument("--debug", action='store_true', required=False, default=False,
                         help="Enable debug mode. Increases verbosity and shortens display time.")
 
-    parser.add_argument("--display-time", action='store', required=False, default=DISPLAY_TIME,
-                        help="Time in milliseconds to display image. Default: {}".format(DISPLAY_TIME))
-
     parser.add_argument('-d', '--downscale-only', action='store_true', required=False,
                         help='Do not upscale images.', default=False)
 
     parser.add_argument('-l', '--log-level', action='store', required=False,
                         choices=["debug", "info", "warning", "error", "critical"],
-                        default=DEFAULT_LOG_LEVEL,
-                        help='Logging verbosity. Default: {}'.format(DEFAULT_LOG_LEVEL))
+                        default=DEFAULT_LOG_LEVEL.upper(),
+                        help='Logging verbosity. Default: {}'.format(DEFAULT_LOG_LEVEL.upper()))
+
+    parser.add_argument("--show-time", action='store', required=False, default=DISPLAY_TIME,
+                        help="Time in milliseconds to show image. Default: {}".format(DISPLAY_TIME))
 
     return parser.parse_args()
 #
@@ -337,7 +443,7 @@ def main():
 
     if args.debug:
         args.log_level = 'INFO'
-        args.display_time = 5 * 1000
+        args.show_time = 5 * 1000
 
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(module)s.%(funcName)s:%(message)s',
@@ -372,45 +478,44 @@ def main():
     pygame.time.delay(5000)
 
     # Start by drawing the first image
-    draw_image(image_file=BytesIO(slide_show.current()))
+    update = draw_image(image_file=BytesIO(slide_show.current()))
+    # update = draw_image(image_file=slide_show.current())
+    if update:
+        display.flip()
 
-    # draw an image every so often by sending an event on an interval
+    # draw an image at set intervals by sending an event on an interval
     # pylint: disable=no-member
-    time.set_timer(pygame.USEREVENT, args.display_time)
+    time.set_timer(pygame.USEREVENT, args.show_time)
 
     # the event loop
     while 1:
 
         update = True
         try:
+            # pylint: disable=no-member
             for event in pygame.event.get():
 
-                # pylint: disable=no-member
+
                 if event.type == pygame.QUIT:
                     sys.exit(0)
 
                 # keypresses
-                # pylint: disable=no-member
                 if event.type == pygame.KEYUP:
                     # look for escape key
-                    # pylint: disable=no-member
                     if event.key == pygame.K_ESCAPE:
                         sys.exit(0)
 
                     # left arrow - display the previous image
-                    # pylint: disable=no-member
                     if event.key == pygame.K_LEFT:
                         # Draw the image
                         update = draw_image(image_file=BytesIO(slide_show.previous()))
 
                     # right arrow - display the next image
-                    # pylint: disable=no-member
                     if event.key == pygame.K_RIGHT:
                         # Draw the image
                         update = draw_image(image_file=BytesIO(slide_show.next()))
 
                 # image display events
-                # pylint: disable=no-member
                 if event.type == pygame.USEREVENT:
                     # Draw the image
                     update = draw_image(image_file=BytesIO(slide_show.next()))

@@ -393,7 +393,7 @@ class Slideshow(SmugBase):
 
                 # NOTE: a positive diff indicates an image smaller than the display, end search if
                 # in downscale mode
-                if self._downscale and diff > 0 :
+                if self._downscale and diff > 0:
                     self._logger.info("Image is smaller than display. Skipping...")
                     break
 
@@ -444,7 +444,8 @@ class Slideshow(SmugBase):
             self._gallery = smugmug.get_gallery_feed()
 
         if self._gallery and shuffle:
-            random.shuffle(self._gallery)
+            self._logger.info("Shuffling gallery...")
+            self._gallery = random.sample(self._gallery, k=len(self._gallery))
     #
     ##############################################################################
     #
