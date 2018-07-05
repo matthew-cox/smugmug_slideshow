@@ -162,8 +162,9 @@ def resize_contain(the_image=None, size=None):
     """
     img_format = the_image.format
     img = the_image.copy()
-    # NOTE: LANCZOS might be another good filter choice
-    img.thumbnail(size, PIL.Image.HAMMING)
+
+    # NOTE: https://pillow.readthedocs.io/en/5.2.x/handbook/concepts.html#filters-comparison-table
+    img.thumbnail(size, PIL.Image.LANCZOS)
 
     # FIll with black. Non-alpha mode
     background = PIL.Image.new('RGB', size, (0, 0, 0))
@@ -408,7 +409,6 @@ def main():
         try:
             # pylint: disable=no-member
             for event in pygame.event.get():
-
 
                 if event.type == pygame.QUIT:
                     sys.exit(0)
