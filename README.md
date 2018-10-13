@@ -51,6 +51,7 @@ Building Python from scratch can be taxing on a RaspberryPi. Fortunately, there 
     pylint3
     python3-exif
     python3-feedparser
+    python3-pil
     python3-pygame
     python3-requests
 
@@ -86,8 +87,8 @@ After the build deps are installed: follow the [macOS instructions](#macos-with-
 ## Commandline Options
 
     $ ./slideshow.py -h
-    usage: slideshow.py [-h] (-g GALLERY_ID | -u GALLERY_URL)
-                        [-l {debug,info,warning,error,critical}]
+    usage: slideshow.py [-h] (-g GALLERY_ID | -u GALLERY_URL) [--debug] [-d]
+                        [-l {debug,info,warning,error,critical}] [--show-time SHOW_TIME]
 
     Run a slideshow of a SmugMug gallery
 
@@ -97,8 +98,13 @@ After the build deps are installed: follow the [macOS instructions](#macos-with-
                             Gallery Id to display
       -u GALLERY_URL, --gallery-url GALLERY_URL
                             URL of Gallery to display
+      --debug               Enable debug mode. Increases verbosity and shortens show time.
+      -d, --downscale-only  Enable downscale mode. Prefer images larger than the display.
+                            Default: False
       -l {debug,info,warning,error,critical}, --log-level {debug,info,warning,error,critical}
                             Logging verbosity. Default: WARNING
+      --show-time SHOW_TIME
+                            Time in milliseconds to show image. Default: 45000
 
 ## Run the slide show
 

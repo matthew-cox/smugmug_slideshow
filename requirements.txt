@@ -9,3 +9,6 @@ pygame == 1.9.3
 
 # smug.py: 22
 requests == 2.18.4
+
+# Python Image Library
+pillow
