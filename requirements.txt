@@ -2,7 +2,7 @@
 # https://github.com/damnever/pigar
 
 # smug.py: 21
-feedparser == 5.2.1
+speedparser3
 
 # slideshow.py: 22
 pygame == 1.9.3

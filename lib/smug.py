@@ -19,7 +19,8 @@ from urllib.parse import urlparse
 # Non-standard imports
 #
 # import exifread
-import feedparser
+# import feedparser
+import speedparser3 as speedparser
 import requests
 #
 ##############################################################################
@@ -130,8 +131,9 @@ class SmugRss(SmugBase):
         else:
             gallery_url = self._gallery_url
 
-        results = feedparser.parse(gallery_url).get('entries')
-
+        feed = requests.get(gallery_url)
+        results = speedparser.parse(feed.text.encode('utf-8'), clean_html=False).get('entries')
+        # print(results)
         if None not in [year]:
             filtered = []
 
@@ -166,7 +168,9 @@ class SmugRss(SmugBase):
             gallery (str): SmugMug gallery id
             year (str): Limit items to provided year of modification
         '''
-        self._recent = feedparser.parse(self._recent_feed_url).get('entries')
+        feed = requests.get(self._recent_feed_url)
+        # print(results)
+        self._recent = speedparser.parse(feed.text.encode('utf-8'), clean_html=False).get('entries')
 
         if None not in [year]:
             filtered = []

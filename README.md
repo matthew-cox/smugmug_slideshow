@@ -58,6 +58,9 @@ Building Python from scratch can be taxing on a RaspberryPi. Fortunately, there 
     # install the dependencies
     $ sudo apt-get install $(grep -v '^#' raspbian-python3.deps)
 
+    # install speedparser for speed
+    $ pip3 install --user speedparser3
+
 
 ### Raspbian with Pyenv and Virtualenv
 
