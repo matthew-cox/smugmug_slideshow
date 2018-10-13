@@ -47,7 +47,7 @@ from smug import Slideshow
 #
 # Global Variables
 #
-DEFAULT_LOG_LEVEL = 'WARNING' if not os.environ.get('PY_LOG_LEVEL') else os.environ['PY_LOG_LEVEL']
+DEFAULT_LOG_LEVEL = os.environ.get('PY_LOG_LEVEL', 'WARNING')
 
 # How long to display each image (in seconds)
 DISPLAY_TIME = 45 * 1000
