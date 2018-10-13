@@ -340,6 +340,7 @@ def handle_arguments():
                         help='Logging verbosity. Default: {}'.format(DEFAULT_LOG_LEVEL.upper()))
 
     parser.add_argument("--show-time", action='store', required=False, default=DISPLAY_TIME,
+                        type=int,
                         help="Time in milliseconds to show image. Default: {}".format(DISPLAY_TIME))
 
     return parser.parse_args()
