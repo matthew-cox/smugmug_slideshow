@@ -8,7 +8,7 @@ speedparser3
 pygame == 1.9.3
 
 # smug.py: 22
-requests == 2.18.4
+requests >= 2.20.0
 
 # Python Image Library
 pillow
