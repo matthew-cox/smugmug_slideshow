@@ -8,7 +8,7 @@ feedparser == 5.2.1
 pygame == 1.9.3
 
 # smug.py: 22
-requests == 2.20.0
+requests == 2.31.0
 
 # Python Image Library
 pillow
